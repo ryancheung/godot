@@ -1,12 +1,12 @@
 /*************************************************************************/
-/*  godot.h                                                              */
+/*  export.h                                                             */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2020 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2020 Godot Engine contributors (cf. AUTHORS.md).   */
+/* Copyright (c) 2007-2019 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2019 Godot Engine contributors (cf. AUTHORS.md)    */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -27,46 +27,92 @@
 /* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
-/**
- @file  godot.h
- @brief ENet Godot header
-*/
 
-#ifndef __ENET_GODOT_H__
-#define __ENET_GODOT_H__
+#include <string>
+#include <cstring>
 
-#ifdef WINDOWS_ENABLED
-#include <stdint.h>
-#include <winsock2.h>
-#endif
-#if defined(UNIX_ENABLED) || defined(HORIZON_ENABLED)
-#include <arpa/inet.h>
-#endif
+typedef uint64_t u64;
+typedef uint32_t u32;
+typedef uint8_t u8;
 
-#ifdef MSG_MAXIOVLEN
-#define ENET_BUFFER_MAXIMUM MSG_MAXIOVLEN
-#endif
+typedef struct {
+	u32 FileOff;
+	u32 Size;
+} NsoSegment;
 
-typedef void *ENetSocket;
+typedef struct {
+	u32 unused;
+	u32 modOffset;
+	u8 Padding[8];
+} NroStart;
 
-#define ENET_SOCKET_NULL NULL
+typedef struct {
+	u8 Magic[4];
+	u32 Unk1;
+	u32 size;
+	u32 Unk2;
+	NsoSegment Segments[3];
+	u32 bssSize;
+	u32 Unk3;
+	u8 BuildId[0x20];
+	u8 Padding[0x20];
+} NroHeader;
 
-#define ENET_HOST_TO_NET_16(value) (htons(value)) /**< macro that converts host to net byte-order of a 16-bit value */
-#define ENET_HOST_TO_NET_32(value) (htonl(value)) /**< macro that converts host to net byte-order of a 32-bit value */
+typedef struct {
+	u64 offset;
+	u64 size;
+} AssetSection;
 
-#define ENET_NET_TO_HOST_16(value) (ntohs(value)) /**< macro that converts net to host byte-order of a 16-bit value */
-#define ENET_NET_TO_HOST_32(value) (ntohl(value)) /**< macro that converts net to host byte-order of a 32-bit value */
+typedef struct {
+	u8 magic[4];
+	u32 version;
+	AssetSection icon;
+	AssetSection nacp;
+	AssetSection romfs;
+} AssetHeader;
 
-typedef struct
-{
-	void *data;
-	size_t dataLength;
-} ENetBuffer;
+typedef struct {
+	char name[0x200];
+	char author[0x100];
+} NacpLanguageEntry;
 
-#define ENET_CALLBACK
+typedef struct {
+	NacpLanguageEntry lang[12];
+	NacpLanguageEntry lang_unk[4];//?
 
-#define ENET_API extern
+	u8 x3000_unk[0x24];////Normally all-zero?
+	u32 x3024_unk;
+	u32 x3028_unk;
+	u32 x302C_unk;
+	u32 x3030_unk;
+	u32 x3034_unk;
+	u64 titleid0;
 
-typedef void ENetSocketSet;
+	u8 x3040_unk[0x20];
+	char version[0x10];
 
-#endif /* __ENET_GODOT_H__ */
+	u64 titleid_dlcbase;
+	u64 titleid1;
+
+	u32 x3080_unk;
+	u32 x3084_unk;
+	u32 x3088_unk;
+	u8 x308C_unk[0x24];//zeros?
+
+	u64 titleid2;
+	u64 titleids[7];//"Array of application titleIDs, normally the same as the above app-titleIDs. Only set for game-updates?"
+
+	u32 x30F0_unk;
+	u32 x30F4_unk;
+
+	u64 titleid3;//"Application titleID. Only set for game-updates?"
+
+	char bcat_passphrase[0x40];
+	u8 x3140_unk[0xEC0];//Normally all-zero?
+} NacpStruct;
+
+unsigned char *read_file(const char *fn, size_t *len_out);
+unsigned char *read_bytes(const char *fn, size_t off, size_t len);
+size_t write_bytes(const char *fn, size_t off, size_t len, const unsigned char *data);
+
+void register_switch_exporter();

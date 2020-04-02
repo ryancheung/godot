@@ -1,12 +1,12 @@
 /*************************************************************************/
-/*  godot.h                                                              */
+/*  audio_driver_switch.h                                                  */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2020 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2020 Godot Engine contributors (cf. AUTHORS.md).   */
+/* Copyright (c) 2007-2019 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2019 Godot Engine contributors (cf. AUTHORS.md)    */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -27,46 +27,59 @@
 /* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
-/**
- @file  godot.h
- @brief ENet Godot header
-*/
 
-#ifndef __ENET_GODOT_H__
-#define __ENET_GODOT_H__
+#include "switch_wrapper.h"
+#include "servers/audio_server.h"
 
-#ifdef WINDOWS_ENABLED
-#include <stdint.h>
-#include <winsock2.h>
-#endif
-#if defined(UNIX_ENABLED) || defined(HORIZON_ENABLED)
-#include <arpa/inet.h>
-#endif
+#include "core/os/mutex.h"
+#include "core/os/thread.h"
 
-#ifdef MSG_MAXIOVLEN
-#define ENET_BUFFER_MAXIMUM MSG_MAXIOVLEN
-#endif
+class AudioDriverSwitch: public AudioDriver {
 
-typedef void *ENetSocket;
+	Thread *thread;
+	Mutex *mutex;
 
-#define ENET_SOCKET_NULL NULL
+	LibnxAudioDriver audren_driver;
+	AudioDriverWaveBuf audren_buffers[2];
+	size_t audren_pool_size;
+	void* audren_pool_ptr;
+	unsigned int audren_buffer_size;
+	unsigned int buffer_size;
+	Vector<int32_t> samples_in;
+	Vector<int16_t> samples_out;
+	
+	String device_name;
+	String new_device;
 
-#define ENET_HOST_TO_NET_16(value) (htons(value)) /**< macro that converts host to net byte-order of a 16-bit value */
-#define ENET_HOST_TO_NET_32(value) (htonl(value)) /**< macro that converts host to net byte-order of a 32-bit value */
+	Error init_device();
+	void finish_device();
 
-#define ENET_NET_TO_HOST_16(value) (ntohs(value)) /**< macro that converts net to host byte-order of a 16-bit value */
-#define ENET_NET_TO_HOST_32(value) (ntohl(value)) /**< macro that converts net to host byte-order of a 32-bit value */
+	static void thread_func(void *p_udata);
 
-typedef struct
-{
-	void *data;
-	size_t dataLength;
-} ENetBuffer;
+	unsigned int mix_rate;
+	SpeakerMode speaker_mode;
+	int channels;
 
-#define ENET_CALLBACK
+	bool active;
+	bool thread_exited;
+	mutable bool exit_thread;
 
-#define ENET_API extern
+public:
+	const char *get_name() const {
+		return "AUDREN";
+	};
 
-typedef void ENetSocketSet;
+	virtual Error init();
+	virtual void start();
+	virtual int get_mix_rate() const;
+	virtual SpeakerMode get_speaker_mode() const;
+	virtual Array get_device_list();
+	virtual String get_device();
+	virtual void set_device(String device);
+	virtual void lock();
+	virtual void unlock();
+	virtual void finish();
 
-#endif /* __ENET_GODOT_H__ */
+	AudioDriverSwitch();
+	~AudioDriverSwitch();
+};

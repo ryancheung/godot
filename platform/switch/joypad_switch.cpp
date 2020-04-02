@@ -1,12 +1,12 @@
 /*************************************************************************/
-/*  godot.h                                                              */
+/*  joypad_linux.cpp                                                     */
 /*************************************************************************/
 /*                       This file is part of:                           */
 /*                           GODOT ENGINE                                */
 /*                      https://godotengine.org                          */
 /*************************************************************************/
-/* Copyright (c) 2007-2020 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2020 Godot Engine contributors (cf. AUTHORS.md).   */
+/* Copyright (c) 2007-2019 Juan Linietsky, Ariel Manzur.                 */
+/* Copyright (c) 2014-2019 Godot Engine contributors (cf. AUTHORS.md)    */
 /*                                                                       */
 /* Permission is hereby granted, free of charge, to any person obtaining */
 /* a copy of this software and associated documentation files (the       */
@@ -27,46 +27,62 @@
 /* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /*************************************************************************/
-/**
- @file  godot.h
- @brief ENet Godot header
-*/
 
-#ifndef __ENET_GODOT_H__
-#define __ENET_GODOT_H__
+#include "joypad_switch.h"
 
-#ifdef WINDOWS_ENABLED
-#include <stdint.h>
-#include <winsock2.h>
-#endif
-#if defined(UNIX_ENABLED) || defined(HORIZON_ENABLED)
-#include <arpa/inet.h>
-#endif
+static HidControllerID pad_id[JOYPADS_MAX] = {
+	CONTROLLER_P1_AUTO, CONTROLLER_PLAYER_2,
+	CONTROLLER_PLAYER_3, CONTROLLER_PLAYER_4,
+	CONTROLLER_PLAYER_5, CONTROLLER_PLAYER_6,
+	CONTROLLER_PLAYER_7, CONTROLLER_PLAYER_8
+};
 
-#ifdef MSG_MAXIOVLEN
-#define ENET_BUFFER_MAXIMUM MSG_MAXIOVLEN
-#endif
+// from editor "Project Settings > Input Map"
+static const HidControllerKeys pad_mapping[] = {
+	KEY_B, KEY_A, KEY_Y, KEY_X,
+	KEY_L, KEY_R, KEY_ZL, KEY_ZR,
+	KEY_LSTICK, KEY_RSTICK,
+	KEY_MINUS, KEY_PLUS,
+	KEY_DUP, KEY_DDOWN, KEY_DLEFT, KEY_DRIGHT
+};
 
-typedef void *ENetSocket;
+JoypadSwitch::JoypadSwitch(InputDefault *in) {
+	input = in;
+	button_count = sizeof(pad_mapping) / sizeof(*pad_mapping);
+	for (int i = 0; i < JOYPADS_MAX; i++) {
+		pads[i].id = pad_id[i];
+	}
+}
 
-#define ENET_SOCKET_NULL NULL
+JoypadSwitch::~JoypadSwitch() {
+}
 
-#define ENET_HOST_TO_NET_16(value) (htons(value)) /**< macro that converts host to net byte-order of a 16-bit value */
-#define ENET_HOST_TO_NET_32(value) (htonl(value)) /**< macro that converts host to net byte-order of a 32-bit value */
+void JoypadSwitch::process() {
 
-#define ENET_NET_TO_HOST_16(value) (ntohs(value)) /**< macro that converts net to host byte-order of a 16-bit value */
-#define ENET_NET_TO_HOST_32(value) (ntohl(value)) /**< macro that converts net to host byte-order of a 32-bit value */
+	u64 changed;
+	static JoypadState pad_old[JOYPADS_MAX];
 
-typedef struct
-{
-	void *data;
-	size_t dataLength;
-} ENetBuffer;
+	for(int index = 0; index < JOYPADS_MAX; index++) {
 
-#define ENET_CALLBACK
+		hidJoystickRead(&pads[index].l_pos, pads[index].id, JOYSTICK_LEFT);
+		hidJoystickRead(&pads[index].r_pos, pads[index].id, JOYSTICK_RIGHT);
+		pads[index].buttons = hidKeysHeld(pads[index].id);
 
-#define ENET_API extern
+		// Axes
+		input->joy_axis(index, 0, {100, (float) (pads[index].l_pos.dx / 32767.0f)});
+		input->joy_axis(index, 1, {100, (float) (-pads[index].l_pos.dy / 32767.0f)});
+		input->joy_axis(index, 2, {100, (float) (pads[index].r_pos.dx / 32767.0f)});
+		input->joy_axis(index, 3, {100, (float) (-pads[index].r_pos.dy / 32767.0f)});
 
-typedef void ENetSocketSet;
-
-#endif /* __ENET_GODOT_H__ */
+		// Buttons
+		changed = pad_old[index].buttons ^ pads[index].buttons;
+		pad_old[index].buttons = pads[index].buttons;
+		if (changed) {
+			for (int i = 0; i < button_count; i++) {
+				if (changed & pad_mapping[i]) {
+					input->joy_button(index, i, (bool) (pads[index].buttons & pad_mapping[i]));
+				}
+			}
+		}
+	}
+}

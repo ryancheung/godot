@@ -40,7 +40,7 @@
 
 #include <errno.h>
 
-#if defined(UNIX_ENABLED)
+#if defined(UNIX_ENABLED) || defined(HORIZON_ENABLED)
 #include <unistd.h>
 #endif
 
@@ -131,6 +131,7 @@ Error FileAccessUnix::_open(const String &p_path, int p_mode_flags) {
 		return last_error;
 	}
 
+#ifndef HORIZON_ENABLED
 	// Set close on exec to avoid leaking it to subprocesses.
 	int fd = fileno(f);
 
@@ -144,6 +145,7 @@ Error FileAccessUnix::_open(const String &p_path, int p_mode_flags) {
 #endif
 	}
 
+#endif
 	last_error = OK;
 	flags = p_mode_flags;
 	return OK;
@@ -290,7 +292,7 @@ bool FileAccessUnix::file_exists(const String &p_path) {
 	if (err)
 		return false;
 
-#ifdef UNIX_ENABLED
+#if defined(UNIX_ENABLED) || defined(HORIZON_ENABLED)
 	// See if we have access to the file
 	if (access(filename.utf8().get_data(), F_OK))
 		return false;

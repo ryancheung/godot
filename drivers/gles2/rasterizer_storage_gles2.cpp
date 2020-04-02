@@ -85,7 +85,7 @@ GLuint RasterizerStorageGLES2::system_fbo = 0;
 #define glClearDepth glClearDepthf
 
 // enable extensions manually for android and ios
-#ifndef UWP_ENABLED
+#if !defined(UWP_ENABLED) && !defined(HORIZON_ENABLED)
 #include <dlfcn.h> // needed to load extensions
 #endif
 
@@ -95,7 +95,7 @@ GLuint RasterizerStorageGLES2::system_fbo = 0;
 //void *glRenderbufferStorageMultisampleAPPLE;
 //void *glResolveMultisampleFramebufferAPPLE;
 #define glRenderbufferStorageMultisample glRenderbufferStorageMultisampleAPPLE
-#elif defined(ANDROID_ENABLED)
+#elif defined(ANDROID_ENABLED) || defined(HORIZON_ENABLED)
 
 #include <GLES2/gl2ext.h>
 PFNGLRENDERBUFFERSTORAGEMULTISAMPLEEXTPROC glRenderbufferStorageMultisampleEXT;
@@ -5965,6 +5965,17 @@ void RasterizerStorageGLES2::initialize() {
 #else
 	//check if mipmaps can be used for SCREEN_TEXTURE and Glow on Mobile and web platforms
 	config.render_to_mipmap_supported = config.extensions.has("GL_OES_fbo_render_mipmap") && config.extensions.has("GL_EXT_texture_lod");
+#endif
+
+// If the desktop build is using S3TC, and you export / run from the IDE for android, if the device supports
+// S3TC it will crash trying to load these textures, as they are not exported in the APK. This is a simple way
+// to prevent Android devices trying to load S3TC, by faking lack of hardware support.
+
+// Switch: this happens on Horizon too.
+#ifndef TOOLS_ENABLED
+#if defined ANDROID_ENABLED || defined HORIZON_ENABLED
+	config.s3tc_supported = false;
+#endif
 #endif
 
 #ifdef GLES_OVER_GL
